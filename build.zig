@@ -91,9 +91,7 @@ pub fn build(b: *Build) !void {
     });
 }
 
-/// The first time we run "zig build", we need to download a nnue file from the
-/// internet. We search for the correct file to download in the macro
-/// #define EvalFileDefaultName in evaluate.h.
+/// The first time we run "zig build", we need to download the necessary nnue files
 fn downloadNNUE(b: *Build, nnue_file: []const u8) !void {
     _ = fs.cwd().statFile(nnue_file) catch |err| {
         switch (err) {
