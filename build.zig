@@ -22,7 +22,7 @@ pub fn build(b: *Build) !void {
     const small_net = b.option([]const u8, "small-net", "Name of the small NNUE (default: \"nn-37f18f62d772.nnue\")") orelse "nn-37f18f62d772.nnue";
     opts.addOption([]const u8, "small-net", small_net);
 
-    const big_net = b.option([]const u8, "big-net", "Name of the big NNUE (default: \"nn-1111cefa1111.nnue\")") orelse "nn-1111cefa1111.nnue";
+    const big_net = b.option([]const u8, "big-net", "Name of the big NNUE (default: \"nn-1111cefa1111.nnue\")") orelse "nn-1c0000000000.nnue";
     opts.addOption([]const u8, "big-net", big_net);
 
     try downloadNNUE(b, small_net);
@@ -62,28 +62,29 @@ pub fn build(b: *Build) !void {
     exe.addCSourceFiles(.{
         .root = stockfish_src_path,
         .files = &.{
-            "movegen.cpp",
-            "engine.cpp",
-            "nnue/features/half_ka_v2_hm.cpp",
-            "nnue/nnue_misc.cpp",
-            "nnue/network.cpp",
-            "memory.cpp",
-            "uci.cpp",
-            "search.cpp",
-            "ucioption.cpp",
-            "tt.cpp",
-            "bitboard.cpp",
-            "score.cpp",
-            "main.cpp",
-            "thread.cpp",
             "benchmark.cpp",
-            "position.cpp",
-            "movepick.cpp",
-            "timeman.cpp",
-            "misc.cpp",
-            "tune.cpp",
-            "syzygy/tbprobe.cpp",
+            "bitboard.cpp",
+            "engine.cpp",
             "evaluate.cpp",
+            "main.cpp",
+            "memory.cpp",
+            "misc.cpp",
+            "movegen.cpp",
+            "movepick.cpp",
+            "nnue/features/half_ka_v2_hm.cpp",
+            "nnue/network.cpp",
+            "nnue/nnue_accumulator.cpp",
+            "nnue/nnue_misc.cpp",
+            "position.cpp",
+            "score.cpp",
+            "search.cpp",
+            "syzygy/tbprobe.cpp",
+            "thread.cpp",
+            "timeman.cpp",
+            "tt.cpp",
+            "tune.cpp",
+            "uci.cpp",
+            "ucioption.cpp",
         },
         .flags = &.{
             if (embed_nets) "" else "-DNNUE_EMBEDDING_OFF=1",
