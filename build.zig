@@ -10,57 +10,36 @@ const http = std.http;
 const math = std.math;
 const mem = std.mem;
 
+const default_networks = .{
+    .small_net = "nn-37f18f62d772.nnue",
+    .big_net = "nn-1c0000000000.nnue",
+};
+
 pub fn build(b: *Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const opts = b.addOptions();
-
-    const embed_nets = b.option(bool, "embed-nets", "Whether or not to embed the NNUE file in the executable (default: true)") orelse true;
-    opts.addOption(bool, "embed-nets", embed_nets);
-
-    const small_net = b.option([]const u8, "small-net", "Name of the small NNUE (default: \"nn-37f18f62d772.nnue\")") orelse "nn-37f18f62d772.nnue";
-    opts.addOption([]const u8, "small-net", small_net);
-
-    const big_net = b.option([]const u8, "big-net", "Name of the big NNUE (default: \"nn-1111cefa1111.nnue\")") orelse "nn-1c0000000000.nnue";
-    opts.addOption([]const u8, "big-net", big_net);
-
-    try downloadNNUE(b, small_net);
-    try downloadNNUE(b, big_net);
-
     const stockfish_dep = b.dependency("Stockfish", .{});
-    const stockfish_src_path = stockfish_dep.path("src/");
+    const stockfish_nets_dep = b.dependency("stockfish_nets", .{});
 
-    const exe = b.addExecutable(.{
-        .name = "stockfish",
+    const copy_nets = b.addUpdateSourceFiles();
+    copy_nets.addCopyFileToSource(stockfish_nets_dep.path(default_networks.small_net), default_networks.small_net);
+    copy_nets.addCopyFileToSource(stockfish_nets_dep.path(default_networks.big_net), default_networks.big_net);
+    copy_nets.step.name = "copy embedded neural networks";
+
+    // Setup main module
+    const main_module = b.createModule(.{
         .target = target,
         .optimize = optimize,
+        .link_libc = true,
+        .link_libcpp = true,
+        .pic = if (optimize != .Debug) true else null,
+        .omit_frame_pointer = if (optimize != .Debug) true else null,
+        .strip = if (optimize != .Debug) true else null,
     });
-    b.installArtifact(exe);
-
-    const run_cmd = b.addRunArtifact(exe);
-    run_cmd.step.dependOn(b.getInstallStep());
-    if (b.args) |args| run_cmd.addArgs(args);
-
-    const run_step = b.step("run", "Build and run stockfish");
-    run_step.dependOn(&run_cmd.step);
-
-    exe.linkLibC();
-    exe.linkLibCpp();
-
-    if (optimize != .Debug) {
-        exe.root_module.pic = true;
-        exe.pie = true;
-        exe.root_module.omit_frame_pointer = true;
-        exe.root_module.strip = true;
-        exe.want_lto = switch (builtin.os.tag) {
-            .macos => false,
-            else => true,
-        };
-    }
-
-    exe.addCSourceFiles(.{
-        .root = stockfish_src_path,
+    main_module.addCMacro("__DATE__", "\"Jan 1 1970\"");
+    main_module.addCSourceFiles(.{
+        .root = stockfish_dep.path("src/"),
         .files = &.{
             "benchmark.cpp",
             "bitboard.cpp",
@@ -86,25 +65,27 @@ pub fn build(b: *Build) !void {
             "uci.cpp",
             "ucioption.cpp",
         },
-        .flags = &.{
-            if (embed_nets) "" else "-DNNUE_EMBEDDING_OFF=1",
-        },
     });
-}
 
-/// The first time we run "zig build", we need to download the necessary nnue files
-fn downloadNNUE(b: *Build, nnue_file: []const u8) !void {
-    _ = fs.cwd().statFile(nnue_file) catch |err| {
-        switch (err) {
-            error.FileNotFound => {
-                const url = try fmt.allocPrint(b.allocator, "https://data.stockfishchess.org/nn/{s}", .{nnue_file});
-                std.debug.print("No nnue file found, downloading {s}\n\n", .{url});
+    // Setup exe
+    const exe = b.addExecutable(.{
+        .name = "stockfish",
+        .root_module = main_module,
+        .linkage = .static,
+    });
+    exe.step.dependOn(&copy_nets.step);
+    if (optimize != .Debug) {
+        exe.pie = true;
+        exe.lto = switch (builtin.os.tag) {
+            .macos => null,
+            else => .full,
+        };
+    }
+    b.installArtifact(exe);
 
-                var child = std.process.Child.init(&.{ "curl", "-o", nnue_file, url }, b.allocator);
-                try child.spawn();
-                _ = try child.wait();
-            },
-            else => return err,
-        }
-    };
+    // Setup run step
+    const run_cmd = b.addRunArtifact(exe);
+    run_cmd.step.dependOn(b.getInstallStep());
+    if (b.args) |args| run_cmd.addArgs(args);
+    b.step("run", "Build and run stockfish").dependOn(&run_cmd.step);
 }

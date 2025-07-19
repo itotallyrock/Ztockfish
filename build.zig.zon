@@ -8,6 +8,10 @@
             .url = "https://github.com/official-stockfish/Stockfish/archive/sf_17.1.tar.gz",
             .hash = "12206bef6885b2f5998e3b5a9e33a9c949f1a70f95502ab032a399ea8e0811ab879e",
         },
+        .stockfish_nets = .{
+            .url = "git+https://github.com/official-stockfish/networks.git#6a6356a2ab2292491b3320a1fb13a443387390e1",
+            .hash = "N-V-__8AAIq4nvnQKOcs_2OIOrvLMiBVNIft2xnjyL8G8jb5",
+        },
     },
     .paths = .{
         "build.zig",
